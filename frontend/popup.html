@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Polymates Lite</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Polymates Lite</h1>
+      <p class="subtitle">Track Polymarket wallet activity</p>
+    </header>
+
+    <div class="wallet-section">
+      <div class="input-group">
+        <input 
+          type="text" 
+          id="walletInput" 
+          placeholder="Enter Polymarket wallet address"
+          class="wallet-input"
+        />
+        <button id="addWalletBtn" class="btn btn-primary">Add Wallet</button>
+      </div>
+      <div id="errorMessage" class="error-message"></div>
+    </div>
+
+    <div class="wallets-list-section">
+      <h2>Tracked Wallets</h2>
+      <div id="walletsList" class="wallets-list"></div>
+    </div>
+
+    <div class="feed-section">
+      <div class="feed-header">
+        <h2>Trade Feed</h2>
+        <button id="refreshBtn" class="btn btn-secondary">Refresh</button>
+      </div>
+      <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+        Loading trades...
+      </div>
+      <div id="feedContainer" class="feed-container">
+        <p class="empty-state">Add a wallet to start tracking trades</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
+
