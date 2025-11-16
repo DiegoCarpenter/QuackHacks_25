@@ -297,35 +297,62 @@ async function fetchMarketMetadata(marketId) {
     return marketMetadataCache[marketId];
   }
 
-  try {
-    const url = `${POLYMARKET_MARKETS_ENDPOINT}?ids=${encodeURIComponent(marketId)}`;
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
+  // Try multiple API endpoint patterns
+  const endpoints = [
+    `${POLYMARKET_MARKETS_ENDPOINT}/${marketId}`,
+    `${POLYMARKET_MARKETS_ENDPOINT}?slug=${encodeURIComponent(marketId)}`,
+    `${POLYMARKET_MARKETS_ENDPOINT}?id=${encodeURIComponent(marketId)}`,
+    `${POLYMARKET_MARKETS_ENDPOINT}?ids=${encodeURIComponent(marketId)}`,
+    `${POLYMARKET_MARKETS_ENDPOINT}?condition_id=${encodeURIComponent(marketId)}`,
+    `${POLYMARKET_MARKETS_ENDPOINT}?event_id=${encodeURIComponent(marketId)}`
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Handle different response formats
+        let market = null;
+        if (Array.isArray(data)) {
+          market = data[0];
+        } else if (data && typeof data === 'object') {
+          market = data.data?.[0] || data.result || data.market || data;
+        }
+        
+        if (market) {
+          const metadata = {
+            title: market.question || 
+                   market.title || 
+                   market.market_title || 
+                   market.name ||
+                   market.event_title ||
+                   "Unknown Market",
+            question: market.question || market.title || "",
+            description: market.description || ""
+          };
+          
+          // Cache the result
+          marketMetadataCache[marketId] = metadata;
+          return metadata;
+        }
       }
-    });
-    
-    if (!response.ok) {
-      return null;
+    } catch (error) {
+      // Continue to next endpoint
+      continue;
     }
-    
-    const data = await response.json();
-    if (Array.isArray(data) && data.length > 0) {
-      const market = data[0];
-      const metadata = {
-        title: market.question || market.title || market.market_title || "Unknown Market",
-        question: market.question || market.title || "",
-        description: market.description || ""
-      };
-      marketMetadataCache[marketId] = metadata;
-      return metadata;
-    }
-    return null;
-  } catch (error) {
-    console.error(`Failed to fetch market metadata for ${marketId}:`, error);
-    return null;
   }
+  
+  // If all endpoints failed, return null (will be cached to avoid repeated attempts)
+  marketMetadataCache[marketId] = { title: "Unknown Market", question: "", description: "" };
+  return null;
 }
 
 function normalizeTrade(raw, walletAddress) {
@@ -342,39 +369,62 @@ function normalizeTrade(raw, walletAddress) {
       side = raw.amount > 0 ? "buy" : "sell";
     }
 
-    // Get market ID
-    const marketId = raw.event_id || raw.market_id || raw.condition_id || "";
+    // Get market ID - check multiple possible fields
+    const marketId = raw.event_id || raw.market_id || raw.condition_id || raw.conditionId || raw.slug || "";
 
-    // Get market title with fallbacks
-    let marketTitle = raw.market_title || raw.event_title || raw.question || "Unknown Market";
+    // Get market title with extensive fallbacks - check all possible fields
+    let marketTitle = raw.market_title || 
+                     raw.event_title || 
+                     raw.question || 
+                     raw.title ||
+                     raw.name ||
+                     raw.marketTitle ||
+                     raw.eventTitle ||
+                     (raw.market && (raw.market.question || raw.market.title || raw.market.name)) ||
+                     (raw.event && (raw.event.question || raw.event.title || raw.event.name)) ||
+                     "";
 
-    // Get outcome
-    const outcome = raw.outcome || raw.token || raw.outcome_title || "Unknown";
+    // Get outcome - check multiple fields
+    const outcome = raw.outcome || 
+                   raw.token || 
+                   raw.outcome_title || 
+                   raw.outcomeTitle ||
+                   raw.outcomeName ||
+                   (raw.outcomeToken && raw.outcomeToken.name) ||
+                   "Unknown";
 
     // Get price
-    const price = parseFloat(raw.price) || parseFloat(raw.outcome_price) || 0;
+    const price = parseFloat(raw.price) || parseFloat(raw.outcome_price) || parseFloat(raw.outcomePrice) || 0;
 
     // Get size (absolute value)
-    const size = Math.abs(parseFloat(raw.amount) || parseFloat(raw.size) || 0);
+    const size = Math.abs(parseFloat(raw.amount) || parseFloat(raw.size) || parseFloat(raw.quantity) || 0);
 
     // Generate ID
-    const id = raw.id || raw.tx_hash || `${walletAddress}-${timestamp}-${Math.random()}`;
+    const id = raw.id || raw.tx_hash || raw.txHash || `${walletAddress}-${timestamp}-${Math.random()}`;
 
-    // Market URL
-    const marketUrl = marketId ? `https://polymarket.com/event/${marketId}` : "";
+    // Market URL - try different formats
+    let marketUrl = "";
+    if (marketId) {
+      // Try slug first, then ID
+      const slug = raw.slug || marketId;
+      marketUrl = `https://polymarket.com/event/${slug}`;
+    }
+
+    // Determine if we need to fetch metadata
+    const needsMetadata = (!marketTitle || marketTitle === "Unknown Market" || marketTitle.trim() === "") && marketId !== "";
 
     return {
       id: id,
       user: walletAddress,
       marketId: marketId,
-      marketTitle: marketTitle,
+      marketTitle: marketTitle || "Loading...",
       outcome: outcome,
       side: side,
       price: price,
       size: size,
       timestamp: timestamp,
       marketUrl: marketUrl,
-      needsMetadata: marketTitle === "Unknown Market" && marketId !== ""
+      needsMetadata: needsMetadata
     };
   } catch (error) {
     showError("Failed to normalize trade: " + error.message);
@@ -383,14 +433,28 @@ function normalizeTrade(raw, walletAddress) {
 }
 
 async function enrichTradeWithMetadata(trade) {
-  if (!trade.needsMetadata || !trade.marketId) {
+  // Always try to enrich if we have a marketId but title is missing or "Loading..."
+  if (!trade.marketId) {
     return trade;
   }
 
-  const metadata = await fetchMarketMetadata(trade.marketId);
-  if (metadata) {
-    trade.marketTitle = metadata.title || trade.marketTitle;
-    trade.question = metadata.question || "";
+  // If title is missing, "Unknown Market", or "Loading...", fetch metadata
+  const shouldFetch = !trade.marketTitle || 
+                     trade.marketTitle === "Unknown Market" || 
+                     trade.marketTitle === "Loading..." ||
+                     trade.marketTitle.trim() === "" ||
+                     trade.needsMetadata;
+
+  if (shouldFetch) {
+    const metadata = await fetchMarketMetadata(trade.marketId);
+    if (metadata && metadata.title && metadata.title !== "Unknown Market") {
+      trade.marketTitle = metadata.title;
+      trade.question = metadata.question || "";
+      trade.needsMetadata = false;
+    } else if (!trade.marketTitle || trade.marketTitle === "Loading...") {
+      // If fetch failed, keep "Unknown Market" but don't show "Loading..."
+      trade.marketTitle = "Unknown Market";
+    }
   }
 
   return trade;
@@ -405,7 +469,9 @@ async function fetchAllTrades(wallets) {
     const results = await Promise.allSettled(promises);
     
     const allTrades = [];
+    const tradesNeedingMetadata = [];
     
+    // First pass: normalize all trades
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
       if (result.status === "fulfilled" && Array.isArray(result.value)) {
@@ -418,9 +484,13 @@ async function fetchAllTrades(wallets) {
           if (normalized) {
             // Add blockchain info to trade
             normalized.blockchain = blockchain;
-            // Enrich with metadata if needed
-            const enriched = await enrichTradeWithMetadata(normalized);
-            allTrades.push(enriched);
+            
+            // Track trades that need metadata
+            if (normalized.needsMetadata) {
+              tradesNeedingMetadata.push(normalized);
+            }
+            
+            allTrades.push(normalized);
           }
         }
       } else if (result.status === "rejected") {
@@ -428,6 +498,13 @@ async function fetchAllTrades(wallets) {
         const walletAddress = getWalletAddress(wallet);
         showError(`Failed to fetch trades for wallet ${walletAddress}: ${result.reason}`);
       }
+    }
+    
+    // Second pass: enrich trades that need metadata (in parallel for better performance)
+    if (tradesNeedingMetadata.length > 0) {
+      const enrichmentPromises = tradesNeedingMetadata.map(trade => enrichTradeWithMetadata(trade));
+      await Promise.all(enrichmentPromises);
+      // Trades are updated in-place, so allTrades already has the updated titles
     }
     
     return allTrades;
