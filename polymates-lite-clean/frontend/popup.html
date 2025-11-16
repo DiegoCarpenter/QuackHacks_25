@@ -25,7 +25,7 @@
         <input 
           type="text" 
           id="wallet-input" 
-          placeholder="Enter Wallet Address or ENS (e.g., vitalik.eth)"
+          placeholder="Enter Wallet Address"
           class="wallet-input"
         />
         <button id="add-wallet-btn" class="btn btn-primary">Add Wallet</button>
@@ -40,18 +40,8 @@
 
     <div class="feed-section">
       <div class="feed-header">
-        <div class="feed-header-left">
-          <h2>Trade Feed</h2>
-          <button id="saved-markets-btn" class="btn btn-small btn-secondary" title="View saved markets">⭐ Saved</button>
-        </div>
-        <div class="feed-header-right">
-          <div class="filter-buttons">
-            <button id="filter-all-btn" class="btn btn-small filter-btn active">All</button>
-            <button id="filter-buy-btn" class="btn btn-small filter-btn">Buys</button>
-            <button id="filter-sell-btn" class="btn btn-small filter-btn">Sells</button>
-          </div>
-          <button id="refresh-btn" class="btn btn-secondary">Refresh</button>
-        </div>
+        <h2>Trade Feed</h2>
+        <button id="refresh-btn" class="btn btn-secondary">Refresh</button>
       </div>
       <div id="loading-indicator" class="loading-indicator" style="display: none;">
         Loading trades...
@@ -66,3 +56,4 @@
   <script src="popup.js"></script>
 </body>
 </html>
+

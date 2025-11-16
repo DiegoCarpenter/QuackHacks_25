@@ -146,5 +146,6 @@ secrets.js
 .env.local
 .env.production
 
-# Note: Core extension files (popup.js, backend-popup.js) are NOT ignored
-# Only ignore files that contain actual API keys, not the code files themselves
+# Files with API keys (add specific files if needed)
+frontend/backend-popup.js
+popup.js

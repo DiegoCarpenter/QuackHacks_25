@@ -32,6 +32,37 @@ function formatSize(size) {
   return num.toFixed(2);
 }
 
+// Helper functions to access backend storage
+function loadNicknames() {
+  try {
+    const stored = localStorage.getItem('polymates_wallet_nicknames');
+    return stored ? JSON.parse(stored) : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function loadFavorites() {
+  try {
+    const stored = localStorage.getItem('polymates_favorite_markets');
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+// Get wallet nickname or shortened address
+function getWalletDisplay(address) {
+  const nicknames = loadNicknames();
+  if (nicknames[address]) {
+    return { display: nicknames[address], isNickname: true };
+  }
+  return {
+    display: `${address.substring(0, 6)}...${address.substring(address.length - 4)}`,
+    isNickname: false
+  };
+}
+
 // Render wallet list - called by backend
 function renderWalletList(wallets) {
   const walletListEl = document.getElementById('wallet-list');
@@ -42,12 +73,25 @@ function renderWalletList(wallets) {
     return;
   }
 
-  walletListEl.innerHTML = wallets.map(wallet => `
-    <div class="wallet-item">
-      <span class="wallet-address">${wallet.substring(0, 6)}...${wallet.substring(wallet.length - 4)}</span>
-      <button class="btn btn-remove remove-wallet-btn" data-wallet="${wallet}">Remove</button>
-    </div>
-  `).join('');
+  const nicknames = loadNicknames();
+
+  walletListEl.innerHTML = wallets.map(wallet => {
+    const nickname = nicknames[wallet];
+    const display = nickname || `${wallet.substring(0, 6)}...${wallet.substring(wallet.length - 4)}`;
+    
+    return `
+      <div class="wallet-item">
+        <div class="wallet-info">
+          <span class="wallet-address">${display}</span>
+          ${nickname ? '<span class="nickname-badge">Nickname</span>' : ''}
+        </div>
+        <div class="wallet-actions">
+          <button class="btn btn-small edit-nickname-btn" data-wallet="${wallet}" title="Edit nickname">✏️</button>
+          <button class="btn btn-small btn-remove remove-wallet-btn" data-wallet="${wallet}">Remove</button>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 // Loading indicator helpers
@@ -69,9 +113,6 @@ function hideLoadingIndicator() {
 function renderFeed(trades) {
   const feedContainer = document.getElementById('feed-container');
   
-  // Hide loading indicator when rendering
-  hideLoadingIndicator();
-  
   if (!feedContainer) return;
 
   if (trades.length === 0) {
@@ -79,19 +120,28 @@ function renderFeed(trades) {
     return;
   }
 
+  const favorites = typeof loadFavorites === "function" ? loadFavorites() : [];
+
   feedContainer.innerHTML = trades.map(trade => {
-    const walletShort = trade.user 
-      ? `${trade.user.substring(0, 6)}...${trade.user.substring(trade.user.length - 4)}`
-      : 'Unknown';
+    const walletDisplay = getWalletDisplay(trade.user);
+    const isFavorite = favorites.includes(trade.marketId);
+    const marketTitle = trade.marketTitle || "Unknown Market";
+    const displayTitle = marketTitle.length > 60 ? marketTitle.substring(0, 60) + "..." : marketTitle;
 
     return `
       <div class="trade-card">
         <div class="trade-header">
-          <span class="wallet-badge">${walletShort}</span>
-          <span class="trade-time">${formatTimestamp(trade.timestamp)}</span>
+          <div class="trade-header-left">
+            <span class="wallet-badge ${walletDisplay.isNickname ? 'nickname' : ''}">${walletDisplay.display}</span>
+            <span class="trade-time">${formatTimestamp(trade.timestamp)}</span>
+          </div>
+          <button class="favorite-btn ${isFavorite ? 'active' : ''}" data-market-id="${trade.marketId}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+            ${isFavorite ? '⭐' : '☆'}
+          </button>
         </div>
         <div class="trade-content">
-          <h3 class="market-title">${trade.marketTitle}</h3>
+          <h3 class="market-title" title="${marketTitle}">${displayTitle}</h3>
+          ${trade.question && trade.question !== marketTitle ? `<p class="market-question">${trade.question}</p>` : ''}
           <div class="trade-details">
             <div class="detail-item">
               <span class="detail-label">Outcome:</span>
@@ -119,6 +169,30 @@ function renderFeed(trades) {
       </div>
     `;
   }).join('');
+}
+
+// Show saved markets
+function showSavedMarkets() {
+  const favorites = loadFavorites();
+  const feedContainer = document.getElementById('feed-container');
+  
+  if (!feedContainer) return;
+
+  if (favorites.length === 0) {
+    feedContainer.innerHTML = '<p class="empty-state">No saved markets yet. Click the star icon on any trade to save it.</p>';
+    return;
+  }
+
+  // Access tradeCache from backend (exposed via window.tradeCache)
+  const allTrades = (typeof window !== "undefined" && window.tradeCache && window.tradeCache.trades) ? window.tradeCache.trades : [];
+  const favoriteTrades = allTrades.filter(trade => favorites.includes(trade.marketId));
+  
+  if (favoriteTrades.length === 0) {
+    feedContainer.innerHTML = '<p class="empty-state">No trades found for saved markets. Add wallets with activity in these markets.</p>';
+    return;
+  }
+
+  renderFeed(favoriteTrades);
 }
 
 // Show error UI - called by backend
@@ -169,17 +243,5 @@ document.addEventListener('DOMContentLoaded', () => {
     themeToggle.addEventListener('click', toggleTheme);
   }
 
-  // Show loading indicator when refresh button is clicked
-  const refreshBtn = document.getElementById('refresh-btn');
-  if (refreshBtn) {
-    refreshBtn.addEventListener('click', () => {
-      showLoadingIndicator();
-    });
-  }
-
-  // Show loading indicator on initial load if there are wallets
-  const wallets = typeof loadWallets === 'function' ? loadWallets() : [];
-  if (wallets.length > 0) {
-    showLoadingIndicator();
-  }
+  // Filter buttons are updated by backend's updateFilterButtons function
 });

@@ -1,10 +1,7 @@
 // Constants
 const POLYMARKET_TRADES_ENDPOINT = "https://data-api.polymarket.com/trades";
-const POLYMARKET_MARKETS_ENDPOINT = "https://data-api.polymarket.com/markets";
-const ENS_RESOLVER_ENDPOINT = "https://api.ensideas.com/ens/resolve";
+const POLYMARKET_API_KEY = "019a88ec-4d56-757a-aad2-3b7d7e683b33";
 const STORAGE_KEY_WALLETS = "polymates_tracked_wallets";
-const STORAGE_KEY_NICKNAMES = "polymates_wallet_nicknames";
-const STORAGE_KEY_FAVORITES = "polymates_favorite_markets";
 const MAX_TRADES_PER_WALLET = 20;
 const CACHE_TTL_MS = 30000;
 
@@ -90,6 +87,7 @@ async function fetchTradesForWallet(address) {
     const response = await fetch(url, {
       method: 'GET',
       headers: {
+        'Authorization': `Bearer ${POLYMARKET_API_KEY}`,
         'Content-Type': 'application/json'
       }
     });
@@ -213,7 +211,7 @@ async function refreshFeed() {
 
 // Error Handling
 function showError(message) {
-  console.error("[Polymates]", message);
+  console.error("[Polymates Lite]", message);
   if (typeof showErrorUI === "function") {
     showErrorUI(message);
   }
@@ -233,7 +231,6 @@ function openMarket(url) {
 // UI Hooks and Event Listeners
 document.addEventListener("DOMContentLoaded", () => {
   try {
-    console.log("[Polymates] Backend initializing...");
     const wallets = loadWallets();
     
     if (typeof renderWalletList === "function") {
@@ -243,13 +240,10 @@ document.addEventListener("DOMContentLoaded", () => {
     refreshFeed();
     
     const addWalletBtn = document.getElementById("add-wallet-btn");
-    console.log("[Polymates] Add wallet button found:", addWalletBtn);
     if (addWalletBtn) {
       addWalletBtn.addEventListener("click", () => {
-        console.log("[Polymates] Add wallet button clicked");
         const input = document.getElementById("wallet-input");
         if (input && input.value) {
-          console.log("[Polymates] Adding wallet:", input.value);
           const success = addWallet(input.value);
           if (success) {
             input.value = "";
@@ -260,12 +254,8 @@ document.addEventListener("DOMContentLoaded", () => {
             tradeCache.lastFetched = 0;
             refreshFeed();
           }
-        } else {
-          console.log("[Polymates] No input value");
         }
       });
-    } else {
-      console.error("[Polymates] Add wallet button NOT FOUND!");
     }
 
     const walletList = document.getElementById("wallet-list");
@@ -319,10 +309,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
     }
-    console.log("[Polymates] Backend initialization complete");
   } catch (error) {
     showError("Failed to initialize UI: " + error.message);
-    console.error("[Polymates] Initialization error:", error);
   }
 });
 

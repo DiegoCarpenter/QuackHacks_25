@@ -1,0 +1,33 @@
+POLYMATES LITE - CHROME EXTENSION
+==================================
+
+QUICK START:
+1. Open Chrome and go to: chrome://extensions/
+2. Enable "Developer mode" (toggle in top-right)
+3. Click "Load unpacked"
+4. Select the "frontend" folder
+5. Click the extension icon to open popup
+
+IMPORTANT - API KEY SETUP:
+- Open: frontend/backend-popup.js
+- Replace "YOUR_API_KEY_HERE" with your actual Polymarket API key
+- Reload the extension in chrome://extensions/
+
+FILE STRUCTURE:
+- frontend/          - All extension files (load this folder in Chrome)
+  - popup.html       - Main UI
+  - popup.js         - Frontend rendering functions
+  - backend-popup.js - Backend logic (contains API key)
+  - styles.css       - Styling
+  - manifest.json    - Extension configuration
+  - logo.png         - Extension icon
+
+- backend/           - Reference backend code
+  - popup.js         - Original backend (with placeholder API key)
+
+TESTING:
+- Add a wallet address (0x...)
+- Click "Add Wallet"
+- View trades in the feed
+- Click "Copy Trade" to open Polymarket
+
