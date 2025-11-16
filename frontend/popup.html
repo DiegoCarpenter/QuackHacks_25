@@ -5,22 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Polymates</title>
   <link rel="stylesheet" href="styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <div class="container">
     <header>
       <div class="header-top">
-        <div>
-          <h1>Polymates</h1>
-          <p class="subtitle">Track Polymarket wallet activity</p>
+        <div class="header-left">
+          <img src="logo.png" alt="Polymates Logo" class="logo-img">
+          <div>
+            <h1>Polymates</h1>
+            <p class="subtitle">Track Polymarket wallet activity</p>
+          </div>
         </div>
-        <div class="header-actions">
-          <button id="settingsBtn" class="icon-btn" aria-label="Settings">⚙️</button>
-          <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
-            <span class="theme-icon">🌙</span>
-          </button>
-        </div>
+        <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
+          <span class="theme-icon">🌙</span>
+        </button>
       </div>
     </header>
 
@@ -40,22 +39,6 @@
     <div class="wallets-list-section">
       <h2>Tracked Wallets</h2>
       <div id="wallet-list" class="wallets-list"></div>
-    </div>
-
-    <div class="charts-section" id="chartsSection" style="display: none;">
-      <div class="chart-container">
-        <div class="chart-header">
-          <h2>Friend Activity</h2>
-          <span class="chart-subtitle" id="networkSentiment"></span>
-        </div>
-        <canvas id="activityChart"></canvas>
-      </div>
-      <div class="chart-container">
-        <div class="chart-header">
-          <h2>Trades Over Time</h2>
-        </div>
-        <canvas id="timeChart"></canvas>
-      </div>
     </div>
 
     <div class="feed-section">
@@ -82,49 +65,7 @@
     </div>
   </div>
 
-  <!-- Settings Modal -->
-  <div id="settingsModal" class="modal hidden">
-    <div class="modal-content">
-      <h3>Settings</h3>
-
-      <label class="row setting">
-        <span>Dark Mode</span>
-        <input type="checkbox" id="toggleDarkMode">
-      </label>
-
-      <label class="row setting">
-        <span>Refresh Interval</span>
-        <select id="refreshSelect">
-          <option value="5000">5 seconds</option>
-          <option value="10000" selected>10 seconds</option>
-          <option value="15000">15 seconds</option>
-          <option value="30000">30 seconds</option>
-          <option value="60000">1 minute</option>
-        </select>
-      </label>
-
-      <label class="row setting">
-        <span>Demo Mode</span>
-        <input type="checkbox" id="toggleDemo">
-      </label>
-
-      <label class="row setting">
-        <span>Hide My Wallet</span>
-        <input type="checkbox" id="togglePrivacy">
-      </label>
-
-      <div class="modal-actions">
-        <button id="clearDataBtn" class="btn btn-danger">Clear All Data</button>
-        <button id="closeSettings" class="btn btn-secondary">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- KEEP backend-popup.js IF YOU NEED IT -->
   <script src="backend-popup.js"></script>
-
-  <!-- MAIN POPUP LOGIC -->
   <script src="popup.js"></script>
-
 </body>
 </html>

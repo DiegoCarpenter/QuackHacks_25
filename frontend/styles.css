@@ -87,6 +87,19 @@ header {
   align-items: flex-start;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 .theme-toggle {
   background: var(--bg-tertiary);
   border: 1.5px solid var(--border-color);
