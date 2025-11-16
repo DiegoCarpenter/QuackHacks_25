@@ -34,18 +34,27 @@ function removeWallet(address) {
 
 // Display error message
 function showError(message) {
-  const errorEl = document.getElementById('errorMessage');
-  errorEl.textContent = message;
-  errorEl.style.display = 'block';
-  setTimeout(() => {
-    errorEl.style.display = 'none';
-  }, 3000);
+  const errorEl = document.getElementById('error-message');
+  if (errorEl) {
+    errorEl.textContent = message;
+    errorEl.style.display = 'block';
+    setTimeout(() => {
+      errorEl.style.display = 'none';
+    }, 3000);
+  }
 }
 
-// Render wallets list
+// Show error UI - called by backend (alias for compatibility)
+function showErrorUI(message) {
+  showError(message);
+}
+
+// Render wallets list (reads from storage)
 function renderWalletsList() {
   const wallets = getStoredWallets();
-  const walletsListEl = document.getElementById('walletsList');
+  const walletsListEl = document.getElementById('wallet-list');
+  if (!walletsListEl) return;
+  
   const hideWallet = settings.hideWallet || false;
   
   if (wallets.length === 0) {
@@ -75,6 +84,32 @@ function renderWalletsList() {
       loadTradeFeed();
     });
   });
+}
+
+// Render wallet list - called by backend (takes wallets as parameter)
+function renderWalletList(wallets) {
+  const walletListEl = document.getElementById('wallet-list');
+  if (!walletListEl) return;
+  
+  const hideWallet = settings.hideWallet || false;
+  
+  if (wallets.length === 0) {
+    walletListEl.innerHTML = '<p class="empty-state">No wallets tracked yet</p>';
+    return;
+  }
+
+  walletListEl.innerHTML = wallets.map(wallet => {
+    const displayAddress = hideWallet 
+      ? '••• ••• •••' 
+      : `${wallet.substring(0, 6)}...${wallet.substring(wallet.length - 4)}`;
+    
+    return `
+      <div class="wallet-item">
+        <span class="wallet-address">${displayAddress}</span>
+        <button class="btn btn-remove remove-wallet-btn" data-wallet="${wallet}">Remove</button>
+      </div>
+    `;
+  }).join('');
 }
 
 // Fetch trades for a single wallet
@@ -141,7 +176,7 @@ let timeChart = null;
 function groupTradesByWallet(trades) {
   const grouped = {};
   trades.forEach(trade => {
-    const wallet = trade.walletAddress || 'Unknown';
+    const wallet = trade.walletAddress || trade.user || 'Unknown';
     if (!grouped[wallet]) {
       grouped[wallet] = [];
     }
@@ -356,30 +391,28 @@ function pulseCharts() {
 // Render trade feed
 async function loadTradeFeed() {
   const wallets = getStoredWallets();
-  const feedContainer = document.getElementById('feedContainer');
-  const loadingIndicator = document.getElementById('loadingIndicator');
+  const feedContainer = document.getElementById('feed-container');
+  const loadingIndicator = document.getElementById('loading-indicator');
   const chartsSection = document.getElementById('chartsSection');
 
   if (wallets.length === 0) {
-    feedContainer.innerHTML = '<p class="empty-state">Add a wallet to start tracking trades</p>';
+    if (feedContainer) {
+      feedContainer.innerHTML = '<p class="empty-state">Add a wallet to start tracking trades</p>';
+    }
     if (chartsSection) chartsSection.style.display = 'none';
     return;
   }
 
-  loadingIndicator.style.display = 'block';
-  feedContainer.innerHTML = '';
-
   try {
-    // Fetch trades for all wallets
-    const allTrades = [];
-    for (const wallet of wallets) {
-      const trades = await fetchTradesForWallet(wallet);
-      // Add wallet address to each trade for display
-      trades.forEach(trade => {
-        trade.walletAddress = wallet;
-        allTrades.push(trade);
-      });
-    }
+    if (loadingIndicator) loadingIndicator.style.display = 'block';
+
+    // Fetch trades for all wallets in parallel
+    const allTradesPromises = wallets.map(wallet => fetchTradesForWallet(wallet));
+    const allTradesArrays = await Promise.all(allTradesPromises);
+    const allTrades = allTradesArrays.flat().map(trade => ({
+      ...trade,
+      walletAddress: trade.user || trade.walletAddress
+    }));
 
     // Sort by timestamp (newest first)
     allTrades.sort((a, b) => {
@@ -389,8 +422,10 @@ async function loadTradeFeed() {
     });
 
     if (allTrades.length === 0) {
-      feedContainer.innerHTML = '<p class="empty-state">No trades found for tracked wallets</p>';
-      loadingIndicator.style.display = 'none';
+      if (feedContainer) {
+        feedContainer.innerHTML = '<p class="empty-state">No trades found for tracked wallets</p>';
+      }
+      if (loadingIndicator) loadingIndicator.style.display = 'none';
       if (chartsSection) chartsSection.style.display = 'none';
       return;
     }
@@ -420,63 +455,151 @@ async function loadTradeFeed() {
     }
 
     // Render trade cards
-    feedContainer.innerHTML = allTrades.map(trade => {
-      const timestamp = trade.timestamp || trade.createdAt || Date.now();
-      const marketTitle = trade.market?.title || trade.question || 'Unknown Market';
-      const outcome = trade.outcome || trade.asset?.outcome || 'N/A';
-      const side = trade.side || (trade.type === 'buy' ? 'Yes' : 'No');
-      const price = trade.price || trade.asset?.price || '0';
-      const size = trade.size || trade.amount || '0';
-      const eventSlug = trade.eventSlug || trade.market?.slug || trade.event?.slug || '';
-      const walletShort = trade.walletAddress 
-        ? `${trade.walletAddress.substring(0, 6)}...${trade.walletAddress.substring(trade.walletAddress.length - 4)}`
-        : 'Unknown';
+    if (feedContainer) {
+      feedContainer.innerHTML = allTrades.map(trade => {
+        const timestamp = trade.timestamp || trade.createdAt || Date.now();
+        const marketTitle = trade.market?.title || trade.marketTitle || trade.question || 'Unknown Market';
+        const outcome = trade.outcome || trade.asset?.outcome || 'N/A';
+        const side = trade.side || (trade.type === 'buy' ? 'Yes' : 'No');
+        const price = trade.price || trade.asset?.price || '0';
+        const size = trade.size || trade.amount || '0';
+        const eventSlug = trade.eventSlug || trade.market?.slug || trade.event?.slug || '';
+        const marketUrl = trade.marketUrl || (eventSlug ? `https://polymarket.com/event/${eventSlug}` : '');
+        const walletShort = trade.walletAddress || trade.user
+          ? `${(trade.walletAddress || trade.user).substring(0, 6)}...${(trade.walletAddress || trade.user).substring((trade.walletAddress || trade.user).length - 4)}`
+          : 'Unknown';
 
-      return `
-        <div class="trade-card">
-          <div class="trade-header">
-            <span class="wallet-badge">${walletShort}</span>
-            <span class="trade-time">${formatTimestamp(timestamp)}</span>
-          </div>
-          <div class="trade-content">
-            <h3 class="market-title">${marketTitle}</h3>
-            <div class="trade-details">
-              <div class="detail-item">
-                <span class="detail-label">Outcome:</span>
-                <span class="detail-value">${outcome}</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">Side:</span>
-                <span class="detail-value ${side.toLowerCase()}">${side}</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">Price:</span>
-                <span class="detail-value">$${formatPrice(price)}</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">Size:</span>
-                <span class="detail-value">${formatSize(size)}</span>
+        return `
+          <div class="trade-card">
+            <div class="trade-header">
+              <span class="wallet-badge">${walletShort}</span>
+              <span class="trade-time">${formatTimestamp(timestamp)}</span>
+            </div>
+            <div class="trade-content">
+              <h3 class="market-title">${marketTitle}</h3>
+              <div class="trade-details">
+                <div class="detail-item">
+                  <span class="detail-label">Outcome:</span>
+                  <span class="detail-value">${outcome}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Side:</span>
+                  <span class="detail-value ${side.toLowerCase()}">${side}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Price:</span>
+                  <span class="detail-value">$${formatPrice(price)}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Size:</span>
+                  <span class="detail-value">${formatSize(size)}</span>
+                </div>
               </div>
             </div>
+            ${marketUrl ? `
+              <a href="${marketUrl}" target="_blank" class="btn btn-copy-trade copy-trade-btn" data-market-url="${marketUrl}">
+                Copy Trade
+              </a>
+            ` : ''}
           </div>
-          ${eventSlug ? `
-            <a href="https://polymarket.com/event/${eventSlug}" target="_blank" class="btn btn-copy-trade">
-              Copy Trade
-            </a>
-          ` : ''}
-        </div>
-      `;
-    }).join('');
+        `;
+      }).join('');
+    }
 
   } catch (error) {
     console.error('Error loading trade feed:', error);
-    feedContainer.innerHTML = '<p class="error-state">Error loading trades. Please try again.</p>';
+    if (feedContainer) {
+      feedContainer.innerHTML = '<p class="error-state">Error loading trades. Please try again.</p>';
+    }
   } finally {
+    if (loadingIndicator) loadingIndicator.style.display = 'none';
+  }
+}
+
+// Loading indicator helpers
+function showLoadingIndicator() {
+  const loadingIndicator = document.getElementById('loading-indicator');
+  if (loadingIndicator) {
+    loadingIndicator.style.display = 'block';
+  }
+}
+
+function hideLoadingIndicator() {
+  const loadingIndicator = document.getElementById('loading-indicator');
+  if (loadingIndicator) {
     loadingIndicator.style.display = 'none';
   }
 }
 
-// Theme Management
+// Render feed - called by backend
+function renderFeed(trades) {
+  const feedContainer = document.getElementById('feed-container');
+  
+  // Hide loading indicator when rendering
+  hideLoadingIndicator();
+  
+  if (!feedContainer) return;
+
+  if (trades.length === 0) {
+    feedContainer.innerHTML = '<p class="empty-state">No trades found for tracked wallets</p>';
+    return;
+  }
+
+  feedContainer.innerHTML = trades.map(trade => {
+    const walletShort = trade.user 
+      ? `${trade.user.substring(0, 6)}...${trade.user.substring(trade.user.length - 4)}`
+      : 'Unknown';
+
+    return `
+      <div class="trade-card">
+        <div class="trade-header">
+          <span class="wallet-badge">${walletShort}</span>
+          <span class="trade-time">${formatTimestamp(trade.timestamp)}</span>
+        </div>
+        <div class="trade-content">
+          <h3 class="market-title">${trade.marketTitle}</h3>
+          <div class="trade-details">
+            <div class="detail-item">
+              <span class="detail-label">Outcome:</span>
+              <span class="detail-value">${trade.outcome}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Side:</span>
+              <span class="detail-value ${trade.side.toLowerCase()}">${trade.side}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Price:</span>
+              <span class="detail-value">$${formatPrice(trade.price)}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Size:</span>
+              <span class="detail-value">${formatSize(trade.size)}</span>
+            </div>
+          </div>
+        </div>
+        ${trade.marketUrl ? `
+          <a href="${trade.marketUrl}" target="_blank" class="btn btn-copy-trade copy-trade-btn" data-market-url="${trade.marketUrl}">
+            Copy Trade
+          </a>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+// Show error UI - called by backend
+function showErrorUI(message) {
+  const errorEl = document.getElementById('error-message');
+  if (errorEl) {
+    errorEl.textContent = message;
+    errorEl.style.display = 'block';
+    setTimeout(() => {
+      errorEl.style.display = 'none';
+    }, 3000);
+  }
+}
+
+// Theme Management (frontend-only feature)
 function getStoredTheme() {
   return localStorage.getItem('polymates_theme') || 'light';
 }
@@ -546,7 +669,7 @@ function startAutoRefresh() {
   }, interval);
 }
 
-// Initialize extension
+// Initialize theme on load
 document.addEventListener('DOMContentLoaded', () => {
   // Initialize theme
   const savedTheme = getStoredTheme();
@@ -644,57 +767,73 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Theme toggle button (existing)
-  document.getElementById('themeToggle').addEventListener('click', () => {
-    toggleTheme();
-    // Sync with settings modal
-    if (toggleDarkMode) {
-      const currentTheme = getStoredTheme();
-      toggleDarkMode.checked = currentTheme === 'dark';
-    }
-  });
+  // Theme toggle button
+  const themeToggle = document.getElementById('themeToggle');
+  if (themeToggle) {
+    themeToggle.addEventListener('click', () => {
+      toggleTheme();
+      // Sync with settings modal
+      if (toggleDarkMode) {
+        const currentTheme = getStoredTheme();
+        toggleDarkMode.checked = currentTheme === 'dark';
+      }
+    });
+  }
 
-  // Add wallet button
-  document.getElementById('addWalletBtn').addEventListener('click', () => {
-    const input = document.getElementById('walletInput');
-    const address = input.value.trim();
-
-    if (!address) {
-      showError('Please enter a wallet address');
-      return;
-    }
-
-    if (!isValidWalletAddress(address)) {
-      showError('Invalid wallet address format. Must be a valid Ethereum address (0x...)');
-      return;
-    }
-
-    if (addWallet(address)) {
-      input.value = '';
-      renderWalletsList();
+  // Show loading indicator when refresh button is clicked
+  const refreshBtn = document.getElementById('refresh-btn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      showLoadingIndicator();
       loadTradeFeed();
-    } else {
-      showError('Wallet already tracked');
-    }
-  });
+    });
+  }
 
-  // Enter key support for wallet input
-  document.getElementById('walletInput').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      document.getElementById('addWalletBtn').click();
-    }
-  });
+  // Add wallet button handler
+  const addWalletBtn = document.getElementById('add-wallet-btn');
+  const walletInput = document.getElementById('wallet-input');
+  
+  if (addWalletBtn && walletInput) {
+    addWalletBtn.addEventListener('click', () => {
+      const address = walletInput.value.trim();
+      
+      if (!address) {
+        showError('Please enter a wallet address');
+        return;
+      }
 
-  // Refresh button
-  document.getElementById('refreshBtn').addEventListener('click', () => {
-    loadTradeFeed();
-  });
+      if (!isValidWalletAddress(address)) {
+        showError('Invalid wallet address format. Must be a valid Ethereum address (0x...)');
+        return;
+      }
+
+      if (addWallet(address)) {
+        walletInput.value = '';
+        renderWalletsList();
+        loadTradeFeed();
+      } else {
+        showError('Wallet already tracked');
+      }
+    });
+
+    // Enter key support for wallet input
+    walletInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        addWalletBtn.click();
+      }
+    });
+  }
 
   // Start auto-refresh with saved interval
   startAutoRefresh();
 
   // Initial render
   renderWalletsList();
-  loadTradeFeed();
+  
+  // Show loading indicator on initial load if there are wallets
+  const wallets = getStoredWallets();
+  if (wallets.length > 0) {
+    showLoadingIndicator();
+    loadTradeFeed();
+  }
 });
-

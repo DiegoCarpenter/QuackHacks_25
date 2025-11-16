@@ -28,18 +28,18 @@
       <div class="input-group">
         <input 
           type="text" 
-          id="walletInput" 
+          id="wallet-input" 
           placeholder="Enter Wallet Address"
           class="wallet-input"
         />
-        <button id="addWalletBtn" class="btn btn-primary">Add Wallet</button>
+        <button id="add-wallet-btn" class="btn btn-primary">Add Wallet</button>
       </div>
-      <div id="errorMessage" class="error-message"></div>
+      <div id="error-message" class="error-message"></div>
     </div>
 
     <div class="wallets-list-section">
       <h2>Tracked Wallets</h2>
-      <div id="walletsList" class="wallets-list"></div>
+      <div id="wallet-list" class="wallets-list"></div>
     </div>
 
     <div class="charts-section" id="chartsSection" style="display: none;">
@@ -61,12 +61,12 @@
     <div class="feed-section">
       <div class="feed-header">
         <h2>Trade Feed</h2>
-        <button id="refreshBtn" class="btn btn-secondary">Refresh</button>
+        <button id="refresh-btn" class="btn btn-secondary">Refresh</button>
       </div>
-      <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+      <div id="loading-indicator" class="loading-indicator" style="display: none;">
         Loading trades...
       </div>
-      <div id="feedContainer" class="feed-container">
+      <div id="feed-container" class="feed-container">
         <p class="empty-state">Add a wallet to start tracking trades</p>
       </div>
     </div>
@@ -110,7 +110,11 @@
     </div>
   </div>
 
+  <!-- KEEP backend-popup.js IF YOU NEED IT -->
+  <script src="backend-popup.js"></script>
+
+  <!-- MAIN POPUP LOGIC -->
   <script src="popup.js"></script>
+
 </body>
 </html>
-

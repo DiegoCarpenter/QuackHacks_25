@@ -231,6 +231,7 @@ function openMarket(url) {
 // UI Hooks and Event Listeners
 document.addEventListener("DOMContentLoaded", () => {
   try {
+    console.log("[Polymates Lite] Backend initializing...");
     const wallets = loadWallets();
     
     if (typeof renderWalletList === "function") {
@@ -240,10 +241,13 @@ document.addEventListener("DOMContentLoaded", () => {
     refreshFeed();
     
     const addWalletBtn = document.getElementById("add-wallet-btn");
+    console.log("[Polymates Lite] Add wallet button found:", addWalletBtn);
     if (addWalletBtn) {
       addWalletBtn.addEventListener("click", () => {
+        console.log("[Polymates Lite] Add wallet button clicked");
         const input = document.getElementById("wallet-input");
         if (input && input.value) {
+          console.log("[Polymates Lite] Adding wallet:", input.value);
           const success = addWallet(input.value);
           if (success) {
             input.value = "";
@@ -254,8 +258,12 @@ document.addEventListener("DOMContentLoaded", () => {
             tradeCache.lastFetched = 0;
             refreshFeed();
           }
+        } else {
+          console.log("[Polymates Lite] No input value");
         }
       });
+    } else {
+      console.error("[Polymates Lite] Add wallet button NOT FOUND!");
     }
 
     const walletList = document.getElementById("wallet-list");
@@ -309,8 +317,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
     }
+    console.log("[Polymates Lite] Backend initialization complete");
   } catch (error) {
     showError("Failed to initialize UI: " + error.message);
+    console.error("[Polymates Lite] Initialization error:", error);
   }
 });
 
