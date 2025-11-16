@@ -137,3 +137,15 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# API Keys and sensitive configuration
+*.key
+*.secret
+config.js
+secrets.js
+.env.local
+.env.production
+
+# Files with API keys (add specific files if needed)
+frontend/backend-popup.js
+popup.js
