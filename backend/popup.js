@@ -1,7 +1,9 @@
 // Constants
 const POLYMARKET_TRADES_ENDPOINT = "https://data-api.polymarket.com/trades";
+const POLYMARKET_MARKETS_ENDPOINT = "https://data-api.polymarket.com/markets";
 const POLYMARKET_API_KEY = "YOUR_API_KEY_HERE"; // Replace with your Polymarket API key
 const STORAGE_KEY_WALLETS = "polymates_tracked_wallets";
+const STORAGE_KEY_ONBOARDING = "polymates_onboarding_completed";
 const MAX_TRADES_PER_WALLET = 20;
 const CACHE_TTL_MS = 30000;
 
@@ -13,7 +15,7 @@ let tradeCache = {
 
 // Wallet Storage System
 function loadWallets() {
-  try {
+  try { 
     const stored = localStorage.getItem(STORAGE_KEY_WALLETS);
     if (!stored) return [];
     const wallets = JSON.parse(stored);
@@ -217,6 +219,53 @@ function showError(message) {
   }
 }
 
+// Market Search API Integration
+async function searchMarkets(query) {
+  try {
+    if (!query || query.trim().length === 0) {
+      return [];
+    }
+
+    const url = `${POLYMARKET_MARKETS_ENDPOINT}?q=${encodeURIComponent(query.trim())}&limit=20`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${POLYMARKET_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    showError(`Failed to search markets: ${error.message}`);
+    return [];
+  }
+}
+
+function normalizeMarket(raw) {
+  try {
+    const marketId = raw.slug || raw.id || raw.condition_id || "";
+    const marketUrl = marketId ? `https://polymarket.com/event/${marketId}` : "";
+
+    return {
+      id: marketId,
+      title: raw.question || raw.title || raw.name || "Unknown Market",
+      liquidity: parseFloat(raw.liquidity) || parseFloat(raw.volume) || 0,
+      category: raw.category || raw.group || "Uncategorized",
+      marketUrl: marketUrl,
+      slug: raw.slug || ""
+    };
+  } catch (error) {
+    showError("Failed to normalize market: " + error.message);
+    return null;
+  }
+}
+
 // Copy-Trade Button Handler
 function openMarket(url) {
   try {
@@ -226,6 +275,39 @@ function openMarket(url) {
   } catch (error) {
     showError("Failed to open market: " + error.message);
   }
+}
+
+// Onboarding System
+function hasCompletedOnboarding() {
+  try {
+    const completed = localStorage.getItem(STORAGE_KEY_ONBOARDING);
+    return completed === "true";
+  } catch (error) {
+    return false;
+  }
+}
+
+function markOnboardingComplete() {
+  try {
+    localStorage.setItem(STORAGE_KEY_ONBOARDING, "true");
+  } catch (error) {
+    console.error("Failed to save onboarding status:", error);
+  }
+}
+
+function startOnboarding() {
+  if (hasCompletedOnboarding()) {
+    return;
+  }
+
+  if (typeof showOnboardingTooltip === "function") {
+    showOnboardingTooltip(0);
+  }
+}
+
+// Expose tradeCache to window for frontend access
+if (typeof window !== "undefined") {
+  window.tradeCache = tradeCache;
 }
 
 // UI Hooks and Event Listeners
@@ -238,6 +320,55 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     refreshFeed();
+    
+    // Market Search Handlers
+    const marketSearchBtn = document.getElementById("market-search-btn");
+    const marketSearchInput = document.getElementById("market-search-input");
+    
+    if (marketSearchBtn && marketSearchInput) {
+      const performSearch = async () => {
+        const query = marketSearchInput.value.trim();
+        if (query.length === 0) {
+          const resultsContainer = document.getElementById("market-search-results");
+          if (resultsContainer) {
+            resultsContainer.style.display = "none";
+          }
+          return;
+        }
+
+        if (typeof showMarketSearchLoading === "function") {
+          showMarketSearchLoading();
+        }
+
+        const markets = await searchMarkets(query);
+        const normalized = markets.map(m => normalizeMarket(m)).filter(m => m !== null);
+        
+        if (typeof renderMarketSearchResults === "function") {
+          renderMarketSearchResults(normalized);
+        }
+      };
+
+      marketSearchBtn.addEventListener("click", performSearch);
+      
+      marketSearchInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          performSearch();
+        }
+      });
+    }
+
+    // Market search results click handler
+    const marketSearchResults = document.getElementById("market-search-results");
+    if (marketSearchResults) {
+      marketSearchResults.addEventListener("click", (e) => {
+        if (e.target && e.target.classList.contains("market-result-item")) {
+          const marketUrl = e.target.getAttribute("data-market-url");
+          if (marketUrl) {
+            openMarket(marketUrl);
+          }
+        }
+      });
+    }
     
     const addWalletBtn = document.getElementById("add-wallet-btn");
     if (addWalletBtn) {
@@ -309,6 +440,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
     }
+
+    // Start onboarding if first run
+    setTimeout(() => {
+      startOnboarding();
+    }, 500);
   } catch (error) {
     showError("Failed to initialize UI: " + error.message);
   }

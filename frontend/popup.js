@@ -231,6 +231,241 @@ function toggleTheme() {
   applyTheme(newTheme);
 }
 
+// Market Search Rendering Functions
+function showMarketSearchLoading() {
+  const resultsContainer = document.getElementById('market-search-results');
+  if (resultsContainer) {
+    resultsContainer.style.display = 'block';
+    resultsContainer.innerHTML = '<div class="loading-indicator">Searching markets...</div>';
+  }
+}
+
+function formatLiquidity(liquidity) {
+  const num = parseFloat(liquidity);
+  if (num >= 1000000) {
+    return `$${(num / 1000000).toFixed(2)}M`;
+  }
+  if (num >= 1000) {
+    return `$${(num / 1000).toFixed(2)}k`;
+  }
+  return `$${num.toFixed(2)}`;
+}
+
+function renderMarketSearchResults(markets) {
+  const resultsContainer = document.getElementById('market-search-results');
+  if (!resultsContainer) return;
+
+  if (markets.length === 0) {
+    resultsContainer.style.display = 'block';
+    resultsContainer.innerHTML = '<p class="empty-state">No markets found</p>';
+    return;
+  }
+
+  resultsContainer.style.display = 'block';
+  resultsContainer.innerHTML = markets.map(market => {
+    const displayTitle = market.title.length > 60 ? market.title.substring(0, 60) + "..." : market.title;
+    return `
+      <div class="market-result-item" data-market-url="${market.marketUrl}">
+        <div class="market-result-content">
+          <h3 class="market-result-title" title="${market.title}">${displayTitle}</h3>
+          <div class="market-result-meta">
+            <span class="market-result-category">${market.category}</span>
+            <span class="market-result-liquidity">${formatLiquidity(market.liquidity)} liquidity</span>
+          </div>
+        </div>
+        <div class="market-result-arrow">→</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Onboarding System
+const onboardingSteps = [
+  {
+    title: "Welcome to Polymates! 🎉",
+    description: "Track wallet activity and discover markets on Polymarket. Let's get started!",
+    target: null,
+    position: "center"
+  },
+  {
+    title: "Add Wallet",
+    description: "Enter a wallet address to track trades from that wallet. You can add multiple wallets!",
+    target: "#wallet-input",
+    position: "bottom"
+  },
+  {
+    title: "Nicknames",
+    description: "After adding a wallet, click the ✏️ button next to it to give it a friendly nickname for easier identification.",
+    target: ".edit-nickname-btn",
+    position: "left",
+    optional: true
+  },
+  {
+    title: "Favorites",
+    description: "Once you have trades, click the ⭐ star on any trade to save markets you're interested in. View them later with the 'Saved' button.",
+    target: ".favorite-btn",
+    position: "right",
+    optional: true
+  },
+  {
+    title: "Filters",
+    description: "Use the filter buttons (All/Buys/Sells) to focus on specific types of trades in your feed.",
+    target: "#filter-all-btn",
+    position: "bottom"
+  },
+  {
+    title: "Copy Trade",
+    description: "Click 'Copy Trade' on any trade card to open that market on Polymarket and follow the trade!",
+    target: ".copy-trade-btn",
+    position: "top",
+    optional: true
+  }
+];
+
+let currentOnboardingStep = 0;
+
+function showOnboardingTooltip(stepIndex) {
+  if (stepIndex >= onboardingSteps.length) {
+    completeOnboarding();
+    return;
+  }
+
+  const step = onboardingSteps[stepIndex];
+  const tooltip = document.getElementById('onboarding-tooltip');
+  const overlay = document.getElementById('onboarding-overlay');
+  const titleEl = document.querySelector('.tooltip-title');
+  const descriptionEl = document.querySelector('.tooltip-description');
+
+  if (!tooltip || !overlay || !titleEl || !descriptionEl) {
+    // Retry after a short delay if elements aren't ready
+    if (stepIndex === 0) {
+      setTimeout(() => showOnboardingTooltip(stepIndex), 200);
+    }
+    return;
+  }
+
+  // Update content
+  titleEl.textContent = step.title;
+  descriptionEl.textContent = step.description;
+
+  // Show overlay
+  overlay.style.display = 'block';
+
+  // Position tooltip
+  if (step.target && step.position !== "center") {
+    const targetEl = document.querySelector(step.target);
+    // Skip optional steps if target element doesn't exist
+    if (!targetEl && step.optional) {
+      nextOnboardingStep();
+      return;
+    }
+    if (targetEl) {
+      // Wait for tooltip to be visible to get its dimensions
+      tooltip.style.display = 'block';
+      tooltip.style.visibility = 'hidden';
+      
+      setTimeout(() => {
+        const rect = targetEl.getBoundingClientRect();
+        const tooltipRect = tooltip.getBoundingClientRect();
+        
+        let top = 0;
+        let left = 0;
+
+        switch (step.position) {
+          case "top":
+            top = rect.top - tooltipRect.height - 20;
+            left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+            break;
+          case "bottom":
+            top = rect.bottom + 20;
+            left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+            break;
+          case "left":
+            top = rect.top + (rect.height / 2) - (tooltipRect.height / 2);
+            left = rect.left - tooltipRect.width - 20;
+            break;
+          case "right":
+            top = rect.top + (rect.height / 2) - (tooltipRect.height / 2);
+            left = rect.right + 20;
+            break;
+        }
+
+        // Keep tooltip within viewport
+        const containerRect = document.body.getBoundingClientRect();
+        if (left < 10) left = 10;
+        if (left + tooltipRect.width > containerRect.width - 10) {
+          left = containerRect.width - tooltipRect.width - 10;
+        }
+        if (top < 10) top = 10;
+        if (top + tooltipRect.height > containerRect.height - 10) {
+          top = containerRect.height - tooltipRect.height - 10;
+        }
+
+        tooltip.style.top = `${top}px`;
+        tooltip.style.left = `${left}px`;
+        tooltip.style.position = 'fixed';
+        tooltip.style.visibility = 'visible';
+      }, 10);
+    } else {
+      // Fallback to center if target not found
+      tooltip.style.top = '50%';
+      tooltip.style.left = '50%';
+      tooltip.style.transform = 'translate(-50%, -50%)';
+      tooltip.style.position = 'fixed';
+      tooltip.style.display = 'block';
+      tooltip.style.visibility = 'visible';
+    }
+  } else {
+    // Center position
+    tooltip.style.top = '50%';
+    tooltip.style.left = '50%';
+    tooltip.style.transform = 'translate(-50%, -50%)';
+    tooltip.style.position = 'fixed';
+    tooltip.style.display = 'block';
+    tooltip.style.visibility = 'visible';
+  }
+
+  // Highlight target element
+  if (step.target) {
+    const targetEl = document.querySelector(step.target);
+    if (targetEl) {
+      targetEl.classList.add('onboarding-highlight');
+      setTimeout(() => {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    }
+  }
+
+  currentOnboardingStep = stepIndex;
+}
+
+function hideOnboardingTooltip() {
+  const tooltip = document.getElementById('onboarding-tooltip');
+  const overlay = document.getElementById('onboarding-overlay');
+  
+  if (tooltip) tooltip.style.display = 'none';
+  if (overlay) overlay.style.display = 'none';
+
+  // Remove highlights
+  document.querySelectorAll('.onboarding-highlight').forEach(el => {
+    el.classList.remove('onboarding-highlight');
+  });
+}
+
+function nextOnboardingStep() {
+  hideOnboardingTooltip();
+  setTimeout(() => {
+    showOnboardingTooltip(currentOnboardingStep + 1);
+  }, 300);
+}
+
+function completeOnboarding() {
+  hideOnboardingTooltip();
+  if (typeof markOnboardingComplete === "function") {
+    markOnboardingComplete();
+  }
+}
+
 // Initialize theme on load
 document.addEventListener('DOMContentLoaded', () => {
   // Initialize theme
@@ -241,6 +476,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const themeToggle = document.getElementById('themeToggle');
   if (themeToggle) {
     themeToggle.addEventListener('click', toggleTheme);
+  }
+
+  // Onboarding tooltip buttons
+  const tooltipNext = document.getElementById('tooltip-next');
+  const tooltipSkip = document.getElementById('tooltip-skip');
+
+  if (tooltipNext) {
+    tooltipNext.addEventListener('click', nextOnboardingStep);
+  }
+
+  if (tooltipSkip) {
+    tooltipSkip.addEventListener('click', completeOnboarding);
+  }
+
+  // Close onboarding on overlay click
+  const overlay = document.getElementById('onboarding-overlay');
+  if (overlay) {
+    overlay.addEventListener('click', completeOnboarding);
   }
 
   // Filter buttons are updated by backend's updateFilterButtons function

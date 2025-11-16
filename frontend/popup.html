@@ -20,6 +20,20 @@
       </div>
     </header>
 
+    <!-- Market Search Section -->
+    <div class="market-search-section">
+      <div class="input-group">
+        <input 
+          type="text" 
+          id="market-search-input" 
+          placeholder="Search markets..."
+          class="market-search-input"
+        />
+        <button id="market-search-btn" class="btn btn-primary">Search</button>
+      </div>
+      <div id="market-search-results" class="market-search-results" style="display: none;"></div>
+    </div>
+
     <div class="wallet-section">
       <div class="input-group">
         <input 
@@ -58,6 +72,19 @@
       </div>
       <div id="feed-container" class="feed-container">
         <p class="empty-state">Add a wallet to start tracking trades</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Onboarding Overlay -->
+  <div id="onboarding-overlay" class="onboarding-overlay" style="display: none;"></div>
+  <div id="onboarding-tooltip" class="onboarding-tooltip" style="display: none;">
+    <div class="tooltip-content">
+      <h3 class="tooltip-title"></h3>
+      <p class="tooltip-description"></p>
+      <div class="tooltip-actions">
+        <button id="tooltip-skip" class="btn btn-small btn-secondary">Skip</button>
+        <button id="tooltip-next" class="btn btn-small btn-primary">Next</button>
       </div>
     </div>
   </div>
