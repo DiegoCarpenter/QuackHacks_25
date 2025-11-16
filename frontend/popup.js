@@ -54,13 +54,32 @@ function loadFavorites() {
 // Get wallet nickname or shortened address
 function getWalletDisplay(address) {
   const nicknames = loadNicknames();
-  if (nicknames[address]) {
-    return { display: nicknames[address], isNickname: true };
+  const lookupKey = address.toLowerCase();
+  if (nicknames[lookupKey]) {
+    return { display: nicknames[lookupKey], isNickname: true };
   }
+  const addressDisplay = address.length > 20 
+    ? `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
+    : address;
   return {
-    display: `${address.substring(0, 6)}...${address.substring(address.length - 4)}`,
+    display: addressDisplay,
     isNickname: false
   };
+}
+
+// Helper to get wallet address (handles both string and object formats)
+function getWalletAddressForDisplay(wallet) {
+  return typeof wallet === 'string' ? wallet : wallet.address;
+}
+
+// Helper to get wallet blockchain
+function getWalletBlockchainForDisplay(wallet) {
+  if (typeof wallet === 'string') {
+    // Try to detect from address format
+    if (wallet.startsWith('0x')) return 'ethereum';
+    return 'solana'; // Default to solana for non-0x addresses
+  }
+  return wallet.blockchain || 'ethereum';
 }
 
 // Render wallet list - called by backend
@@ -76,18 +95,32 @@ function renderWalletList(wallets) {
   const nicknames = loadNicknames();
 
   walletListEl.innerHTML = wallets.map(wallet => {
-    const nickname = nicknames[wallet];
-    const display = nickname || `${wallet.substring(0, 6)}...${wallet.substring(wallet.length - 4)}`;
+    const address = getWalletAddressForDisplay(wallet);
+    const blockchain = getWalletBlockchainForDisplay(wallet);
+    const lookupKey = address.toLowerCase();
+    const nickname = nicknames[lookupKey];
+    
+    // Format address display
+    const addressDisplay = address.length > 20 
+      ? `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
+      : address;
+    const display = nickname || addressDisplay;
+    
+    // Blockchain badge
+    const blockchainBadge = blockchain === 'solana' 
+      ? '<span class="blockchain-badge solana-badge">SOL</span>'
+      : '<span class="blockchain-badge ethereum-badge">ETH</span>';
     
     return `
       <div class="wallet-item">
         <div class="wallet-info">
           <span class="wallet-address">${display}</span>
+          ${blockchainBadge}
           ${nickname ? '<span class="nickname-badge">Nickname</span>' : ''}
         </div>
         <div class="wallet-actions">
-          <button class="btn btn-small edit-nickname-btn" data-wallet="${wallet}" title="Edit nickname">✏️</button>
-          <button class="btn btn-small btn-remove remove-wallet-btn" data-wallet="${wallet}">Remove</button>
+          <button class="btn btn-small edit-nickname-btn" data-wallet="${address}" title="Edit nickname">✏️</button>
+          <button class="btn btn-small btn-remove remove-wallet-btn" data-wallet="${address}">Remove</button>
         </div>
       </div>
     `;

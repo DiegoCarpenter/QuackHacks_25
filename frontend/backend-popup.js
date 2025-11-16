@@ -22,12 +22,27 @@ if (typeof window !== 'undefined') {
 let marketMetadataCache = {};
 
 // Wallet Storage System
+// Wallets are stored as objects: {address: string, blockchain: 'ethereum'|'solana'}
+// For backward compatibility, we also support simple string arrays
 function loadWallets() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY_WALLETS);
     if (!stored) return [];
     const wallets = JSON.parse(stored);
-    return Array.isArray(wallets) ? wallets : [];
+    
+    if (!Array.isArray(wallets)) return [];
+    
+    // Migrate old format (string array) to new format (object array)
+    if (wallets.length > 0 && typeof wallets[0] === 'string') {
+      const migrated = wallets.map(addr => ({
+        address: addr.toLowerCase(),
+        blockchain: detectBlockchain(addr) || 'ethereum' // Default to ethereum for old entries
+      }));
+      saveWallets(migrated);
+      return migrated;
+    }
+    
+    return wallets;
   } catch (error) {
     showError("Failed to load wallets: " + error.message);
     return [];
@@ -40,6 +55,19 @@ function saveWallets(wallets) {
   } catch (error) {
     showError("Failed to save wallets: " + error.message);
   }
+}
+
+// Helper to get wallet address string (for backward compatibility)
+function getWalletAddress(wallet) {
+  return typeof wallet === 'string' ? wallet : wallet.address;
+}
+
+// Helper to get wallet blockchain
+function getWalletBlockchain(wallet) {
+  if (typeof wallet === 'string') {
+    return detectBlockchain(wallet) || 'ethereum';
+  }
+  return wallet.blockchain || 'ethereum';
 }
 
 function loadNicknames() {
@@ -78,9 +106,29 @@ function saveFavorites(favorites) {
   }
 }
 
-function isValidAddress(address) {
+function isValidEthereumAddress(address) {
   const evmRegex = /^0x[a-fA-F0-9]{40}$/;
   return evmRegex.test(address);
+}
+
+function isValidSolanaAddress(address) {
+  // Solana addresses are Base58 encoded, typically 32-44 characters
+  // Base58 uses: 123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz
+  const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+  return base58Regex.test(address);
+}
+
+function isValidAddress(address) {
+  return isValidEthereumAddress(address) || isValidSolanaAddress(address);
+}
+
+function detectBlockchain(address) {
+  if (isValidEthereumAddress(address)) {
+    return 'ethereum';
+  } else if (isValidSolanaAddress(address)) {
+    return 'solana';
+  }
+  return null;
 }
 
 function isValidENS(name) {
@@ -107,24 +155,44 @@ async function resolveENS(ensName) {
 async function addWallet(addressOrENS) {
   try {
     const trimmed = addressOrENS.trim();
-    let address = trimmed.toLowerCase();
+    let address = trimmed;
     
     // Resolve ENS if needed
     if (isValidENS(trimmed)) {
       address = await resolveENS(trimmed);
-    } else if (!isValidAddress(address)) {
-      showError("Invalid wallet address or ENS name format");
+      address = address.toLowerCase();
+    } else if (!isValidAddress(trimmed)) {
+      showError("Invalid wallet address or ENS name format. Supports Ethereum (0x...) and Solana addresses.");
       return false;
     }
 
+    // Detect blockchain type
+    const blockchain = detectBlockchain(address);
+    if (!blockchain) {
+      showError("Could not detect blockchain type for address");
+      return false;
+    }
+
+    // Normalize address based on blockchain
+    if (blockchain === 'ethereum') {
+      address = address.toLowerCase();
+    }
+    // Solana addresses are case-sensitive, keep as-is
+
     const wallets = loadWallets();
     
-    if (wallets.includes(address)) {
+    // Check for duplicates
+    const isDuplicate = wallets.some(w => {
+      const wAddr = getWalletAddress(w);
+      return wAddr.toLowerCase() === address.toLowerCase() || wAddr === address;
+    });
+    
+    if (isDuplicate) {
       showError("Wallet already tracked");
       return false;
     }
 
-    wallets.push(address);
+    wallets.push({ address, blockchain });
     saveWallets(wallets);
     return true;
   } catch (error) {
@@ -133,11 +201,19 @@ async function addWallet(addressOrENS) {
   }
 }
 
-function removeWallet(address) {
+function removeWallet(addressOrWallet) {
   try {
-    const normalized = address.trim().toLowerCase();
+    // Handle both string addresses and wallet objects
+    const targetAddress = typeof addressOrWallet === 'string' 
+      ? addressOrWallet.trim() 
+      : getWalletAddress(addressOrWallet);
+    
     const wallets = loadWallets();
-    const filtered = wallets.filter(w => w !== normalized);
+    const filtered = wallets.filter(w => {
+      const wAddr = getWalletAddress(w);
+      // Compare case-insensitive for Ethereum, case-sensitive for Solana
+      return wAddr.toLowerCase() !== targetAddress.toLowerCase() && wAddr !== targetAddress;
+    });
     
     if (filtered.length === wallets.length) {
       return false;
@@ -151,9 +227,14 @@ function removeWallet(address) {
   }
 }
 
-function setWalletNickname(address, nickname) {
+function setWalletNickname(addressOrWallet, nickname) {
   try {
-    const normalized = address.trim().toLowerCase();
+    const address = typeof addressOrWallet === 'string' 
+      ? addressOrWallet.trim() 
+      : getWalletAddress(addressOrWallet);
+    
+    // Use lowercase for storage key (works for both chains)
+    const normalized = address.toLowerCase();
     const nicknames = loadNicknames();
     if (nickname && nickname.trim()) {
       nicknames[normalized] = nickname.trim();
@@ -317,7 +398,10 @@ async function enrichTradeWithMetadata(trade) {
 
 async function fetchAllTrades(wallets) {
   try {
-    const promises = wallets.map(wallet => fetchTradesForWallet(wallet));
+    const promises = wallets.map(wallet => {
+      const address = getWalletAddress(wallet);
+      return fetchTradesForWallet(address);
+    });
     const results = await Promise.allSettled(promises);
     
     const allTrades = [];
@@ -325,17 +409,24 @@ async function fetchAllTrades(wallets) {
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
       if (result.status === "fulfilled" && Array.isArray(result.value)) {
-        const walletAddress = wallets[i];
+        const wallet = wallets[i];
+        const walletAddress = getWalletAddress(wallet);
+        const blockchain = getWalletBlockchain(wallet);
+        
         for (const rawTrade of result.value) {
           const normalized = normalizeTrade(rawTrade, walletAddress);
           if (normalized) {
+            // Add blockchain info to trade
+            normalized.blockchain = blockchain;
             // Enrich with metadata if needed
             const enriched = await enrichTradeWithMetadata(normalized);
             allTrades.push(enriched);
           }
         }
       } else if (result.status === "rejected") {
-        showError(`Failed to fetch trades for wallet ${wallets[i]}: ${result.reason}`);
+        const wallet = wallets[i];
+        const walletAddress = getWalletAddress(wallet);
+        showError(`Failed to fetch trades for wallet ${walletAddress}: ${result.reason}`);
       }
     }
     
@@ -462,20 +553,79 @@ async function searchMarkets(query) {
       return [];
     }
 
-    const url = `${POLYMARKET_MARKETS_ENDPOINT}?q=${encodeURIComponent(query.trim())}&limit=20`;
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
+    // Try multiple API endpoint patterns
+    const searchQuery = encodeURIComponent(query.trim());
+    const endpoints = [
+      `${POLYMARKET_MARKETS_ENDPOINT}?query=${searchQuery}&limit=20`,
+      `${POLYMARKET_MARKETS_ENDPOINT}?search=${searchQuery}&limit=20`,
+      `${POLYMARKET_MARKETS_ENDPOINT}?q=${searchQuery}&limit=20`,
+      `${POLYMARKET_MARKETS_ENDPOINT}?text=${searchQuery}&limit=20`
+    ];
+
+    // Try each endpoint until one works
+    for (const url of endpoints) {
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          // Handle different response formats
+          if (Array.isArray(data)) {
+            return data;
+          } else if (data && Array.isArray(data.data)) {
+            return data.data;
+          } else if (data && Array.isArray(data.results)) {
+            return data.results;
+          } else if (data && Array.isArray(data.markets)) {
+            return data.markets;
+          }
+          // If we got a successful response but unexpected format, try next endpoint
+          continue;
+        } else if (response.status !== 404) {
+          // If it's not a 404, log the error but try next endpoint
+          console.warn(`Market search endpoint returned ${response.status}: ${url}`);
+        }
+      } catch (fetchError) {
+        // Continue to next endpoint on error
+        continue;
       }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
     }
     
-    const data = await response.json();
-    return Array.isArray(data) ? data : [];
+    // If all endpoints failed, try a simpler approach - get all markets and filter client-side
+    // This is a fallback for when search endpoints don't work
+    try {
+      const url = `${POLYMARKET_MARKETS_ENDPOINT}?limit=100&active=true`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const markets = Array.isArray(data) ? data : (data?.data || data?.results || data?.markets || []);
+        
+        // Client-side filtering
+        const queryLower = query.trim().toLowerCase();
+        const filtered = markets.filter(market => {
+          const title = (market.question || market.title || market.name || "").toLowerCase();
+          const category = (market.category || market.group || "").toLowerCase();
+          return title.includes(queryLower) || category.includes(queryLower);
+        });
+        
+        return filtered.slice(0, 20); // Limit to 20 results
+      }
+    } catch (fallbackError) {
+      console.error("Fallback market search failed:", fallbackError);
+    }
+    
+    throw new Error("All market search endpoints failed");
   } catch (error) {
     showError(`Failed to search markets: ${error.message}`);
     return [];
@@ -646,7 +796,9 @@ if (!window.POLYMATES_BOUND) {
             const walletAddress = e.target.getAttribute("data-wallet");
             if (walletAddress) {
               const nicknames = loadNicknames();
-              const currentNickname = nicknames[walletAddress] || "";
+              // Use lowercase for lookup
+              const lookupKey = walletAddress.toLowerCase();
+              const currentNickname = nicknames[lookupKey] || "";
               const newNickname = prompt("Enter nickname for this wallet:", currentNickname);
               if (newNickname !== null) {
                 setWalletNickname(walletAddress, newNickname);

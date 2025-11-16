@@ -468,6 +468,27 @@ header h1 {
   text-transform: uppercase;
 }
 
+.blockchain-badge {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+}
+
+.ethereum-badge {
+  background: rgba(98, 126, 234, 0.15);
+  color: #627eea;
+  border: 1px solid rgba(98, 126, 234, 0.3);
+}
+
+.solana-badge {
+  background: rgba(152, 103, 255, 0.15);
+  color: #9867ff;
+  border: 1px solid rgba(152, 103, 255, 0.3);
+}
+
 .wallet-actions {
   display: flex;
   gap: 6px;
