@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Polymates Lite",
+  "name": "Polymates",
   "version": "1.0.0",
   "description": "A Chrome extension that adds a simple social layer to Polymarket by allowing users to track wallet activity and view a real-time feed of trades.",
   "permissions": [

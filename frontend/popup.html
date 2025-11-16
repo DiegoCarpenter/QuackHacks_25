@@ -3,14 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Polymates Lite</title>
+  <title>Polymates</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>Polymates Lite</h1>
-      <p class="subtitle">Track Polymarket wallet activity</p>
+      <div class="header-top">
+        <div>
+          <h1>Polymates</h1>
+          <p class="subtitle">Track Polymarket Wallet Activity</p>
+        </div>
+        <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
+          <span class="theme-icon">🌙</span>
+        </button>
+      </div>
     </header>
 
     <div class="wallet-section">
@@ -18,7 +25,7 @@
         <input 
           type="text" 
           id="walletInput" 
-          placeholder="Enter Polymarket wallet address"
+          placeholder="Enter Wallet Address"
           class="wallet-input"
         />
         <button id="addWalletBtn" class="btn btn-primary">Add Wallet</button>

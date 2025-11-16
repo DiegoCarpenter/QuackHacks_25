@@ -222,8 +222,39 @@ async function loadTradeFeed() {
   }
 }
 
+// Theme Management
+function getStoredTheme() {
+  return localStorage.getItem('polymates_theme') || 'light';
+}
+
+function setStoredTheme(theme) {
+  localStorage.setItem('polymates_theme', theme);
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const themeIcon = document.querySelector('.theme-icon');
+  if (themeIcon) {
+    themeIcon.textContent = theme === 'dark' ? '☀️' : '🌙';
+  }
+}
+
+function toggleTheme() {
+  const currentTheme = getStoredTheme();
+  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  setStoredTheme(newTheme);
+  applyTheme(newTheme);
+}
+
 // Initialize extension
 document.addEventListener('DOMContentLoaded', () => {
+  // Initialize theme
+  const savedTheme = getStoredTheme();
+  applyTheme(savedTheme);
+
+  // Theme toggle button
+  document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
   // Add wallet button
   document.getElementById('addWalletBtn').addEventListener('click', () => {
     const input = document.getElementById('walletInput');
