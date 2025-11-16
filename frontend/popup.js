@@ -264,54 +264,6 @@ function toggleTheme() {
   applyTheme(newTheme);
 }
 
-// Market Search Rendering Functions
-function showMarketSearchLoading() {
-  const resultsContainer = document.getElementById('market-search-results');
-  if (resultsContainer) {
-    resultsContainer.style.display = 'block';
-    resultsContainer.innerHTML = '<div class="loading-indicator">Searching markets...</div>';
-  }
-}
-
-function formatLiquidity(liquidity) {
-  const num = parseFloat(liquidity);
-  if (num >= 1000000) {
-    return `$${(num / 1000000).toFixed(2)}M`;
-  }
-  if (num >= 1000) {
-    return `$${(num / 1000).toFixed(2)}k`;
-  }
-  return `$${num.toFixed(2)}`;
-}
-
-function renderMarketSearchResults(markets) {
-  const resultsContainer = document.getElementById('market-search-results');
-  if (!resultsContainer) return;
-
-  if (markets.length === 0) {
-    resultsContainer.style.display = 'block';
-    resultsContainer.innerHTML = '<p class="empty-state">No markets found</p>';
-    return;
-  }
-
-  resultsContainer.style.display = 'block';
-  resultsContainer.innerHTML = markets.map(market => {
-    const displayTitle = market.title.length > 60 ? market.title.substring(0, 60) + "..." : market.title;
-    return `
-      <div class="market-result-item" data-market-url="${market.marketUrl}">
-        <div class="market-result-content">
-          <h3 class="market-result-title" title="${market.title}">${displayTitle}</h3>
-          <div class="market-result-meta">
-            <span class="market-result-category">${market.category}</span>
-            <span class="market-result-liquidity">${formatLiquidity(market.liquidity)} liquidity</span>
-          </div>
-        </div>
-        <div class="market-result-arrow">→</div>
-      </div>
-    `;
-  }).join('');
-}
-
 // Onboarding System
 const onboardingSteps = [
   {

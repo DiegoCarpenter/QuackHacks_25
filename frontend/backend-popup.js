@@ -781,56 +781,6 @@ if (!window.POLYMATES_BOUND) {
       
       refreshFeed();
       
-      // Market Search Handlers
-      const marketSearchBtn = document.getElementById("market-search-btn");
-      const marketSearchInput = document.getElementById("market-search-input");
-      
-      if (marketSearchBtn && marketSearchInput) {
-        const performSearch = async () => {
-          const query = marketSearchInput.value.trim();
-          if (query.length === 0) {
-            const resultsContainer = document.getElementById("market-search-results");
-            if (resultsContainer) {
-              resultsContainer.style.display = "none";
-            }
-            return;
-          }
-
-          if (typeof showMarketSearchLoading === "function") {
-            showMarketSearchLoading();
-          }
-
-          const markets = await searchMarkets(query);
-          const normalized = markets.map(m => normalizeMarket(m)).filter(m => m !== null);
-          
-          if (typeof renderMarketSearchResults === "function") {
-            renderMarketSearchResults(normalized);
-          }
-        };
-
-        marketSearchBtn.addEventListener("click", performSearch);
-        
-        marketSearchInput.addEventListener("keypress", (e) => {
-          if (e.key === "Enter") {
-            performSearch();
-          }
-        });
-      }
-
-      // Market search results click handler
-      const marketSearchResults = document.getElementById("market-search-results");
-      if (marketSearchResults) {
-        marketSearchResults.addEventListener("click", (e) => {
-          const item = e.target.closest(".market-result-item");
-          if (item) {
-            const marketUrl = item.getAttribute("data-market-url");
-            if (marketUrl) {
-              openMarket(marketUrl);
-            }
-          }
-        });
-      }
-      
       // Add wallet button
       const addWalletBtn = document.getElementById("add-wallet-btn");
       if (addWalletBtn) {
