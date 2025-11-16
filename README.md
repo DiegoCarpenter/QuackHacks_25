@@ -1,6 +1,3 @@
-# QuackHacks_25
-UO Hackathon's smartest coders. 
-
 **Polymates**
 
 A Chrome extension that adds a simple social layer to Polymarket by allowing users to track wallet activity and view a real-time feed of trades.
