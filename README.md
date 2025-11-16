@@ -1,19 +1,19 @@
 # QuackHacks_25
 UO Hackathon's smartest coders. 
 
-**Polymates Lite:**
+**Polymates**
 
 A Chrome extension that adds a simple social layer to Polymarket by allowing users to track wallet activity and view a real-time feed of trades.
 
 **Overview:**
 
-Polymates Lite introduces transparency and accessibility to prediction markets by enabling users to follow friends’ or notable traders’ Polymarket wallets. The extension displays a streamlined feed of recent trades, including market details, outcomes, prices, volumes, and timestamps. Users can open the corresponding Polymarket market directly from the feed to replicate or analyze the trade.
+Polymates introduces transparency and accessibility to prediction markets by enabling users to follow friends’ or notable traders’ Polymarket wallets. The extension displays a streamlined feed of recent trades, including market details, outcomes, prices, volumes, and timestamps. Users can open the corresponding Polymarket market directly from the feed to replicate or analyze the trade.
 
 The extension is entirely client-side, requires no backend, and uses the Polymarket Data API to retrieve recent trade activity.
 
 **Features:**
 
-- Add and track any Polymarket wallet address.
+- Add and track any Polymarket wallet address (ETH or SOL).
 
 - View a unified feed of recent trades across all tracked wallets.
 
@@ -23,7 +23,7 @@ The extension is entirely client-side, requires no backend, and uses the Polymar
 
 - Local storage persistence for all saved wallets.
 
-- Clean, dark-mode UI designed for Chrome’s popup environment.
+- Clean, dark + light mode UI designed for Chrome’s popup environment.
 
 - No backend or server dependencies.
 
